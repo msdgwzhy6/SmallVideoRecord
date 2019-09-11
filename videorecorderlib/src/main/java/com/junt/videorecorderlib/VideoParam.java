@@ -4,7 +4,7 @@ import android.media.MediaMetadataRetriever;
 import android.util.Log;
 
 public class VideoParam {
-    private final String TAG=VideoParam.class.getSimpleName();
+    private final String TAG= VideoParam.class.getSimpleName();
 
     private String videoPath;
     private String duration;

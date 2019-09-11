@@ -11,7 +11,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.provider.MediaStore;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -20,7 +19,6 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -55,7 +53,7 @@ public class RecordVideoActivity extends AppCompatActivity implements
     private ProgressHandler progressHandler;
     private boolean isRecording = false;
     private SharedPreferences sp;
-
+    private long clickTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,19 +109,16 @@ public class RecordVideoActivity extends AppCompatActivity implements
         Camera.Size optimalSize = CameraHelper.getOptimalVideoSize(mSupportedVideoSizes,
                 mSupportedPreviewSizes, surfaceView.getWidth(), surfaceView.getHeight());
         mCamera.setDisplayOrientation(90);
-        // Use the same size for recording profile.
         CamcorderProfile profile = CamcorderProfile.get(sp.getInt(RecordConfig.CONFIG_QUALITY, CamcorderProfile.QUALITY_480P));
         profile.videoFrameWidth = optimalSize.width;
         profile.videoFrameHeight = optimalSize.height;
-        profile.videoBitRate=sp.getInt(RecordConfig.CONFIG_ENCODING_BIT_RATE, 5 * 1280 * 720);
-        profile.videoFrameRate=sp.getInt(RecordConfig.CONFIG_FRAME_RATE, 30);
-        // likewise for the camera object itself.
+        profile.videoBitRate = sp.getInt(RecordConfig.CONFIG_ENCODING_BIT_RATE, 5 * 1280 * 720);
+        profile.videoFrameRate = sp.getInt(RecordConfig.CONFIG_FRAME_RATE, 30);
         parameters.setPreviewSize(profile.videoFrameWidth, profile.videoFrameHeight);
         parameters.setFocusMode(sp.getString(RecordConfig.CONFIG_FOCUS_MODE, Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO));
+        parameters.setFlashMode(Camera.Parameters.FLASH_MODE_AUTO);
         mCamera.setParameters(parameters);
         try {
-            // Requires API level 11+, For backward compatibility use {@link setPreviewDisplay}
-            // with {@link SurfaceView}
             mCamera.setPreviewDisplay(surfaceView.getHolder());
             mCamera.startPreview();
             Log.d(TAG, "Camera初始化结束");
@@ -136,7 +131,7 @@ public class RecordVideoActivity extends AppCompatActivity implements
         mMediaRecorder.setCamera(mCamera);
         mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
         mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-        mMediaRecorder.setProfile(profile);
+        mMediaRecorder.setProfile(CamcorderProfile.get(sp.getInt(RecordConfig.CONFIG_QUALITY, CamcorderProfile.QUALITY_480P)));
 
 //        mMediaRecorder.setVideoFrameRate(sp.getInt(RecordConfig.CONFIG_FRAME_RATE, 30));
 //        mMediaRecorder.setVideoEncodingBitRate(sp.getInt(RecordConfig.CONFIG_ENCODING_BIT_RATE, 5 * 1280 * 720));
@@ -204,20 +199,15 @@ public class RecordVideoActivity extends AppCompatActivity implements
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_CODE_TO_PLAY) {
-            if (resultCode==RESULT_CANCELED){
+            if (resultCode == RESULT_CANCELED) {
                 resetProgress();
                 showRecordController();
                 deleteFile();
-            }else if (resultCode==RESULT_OK){
-                boolean isCompress=data.getBooleanExtra("isCompressSuccess",false);
-                if (isCompress){
-                    Log.i(TAG,"video compress error，return the original video");
-                }else {
-                    Log.i(TAG,"video compress success，return the compressed video");
-                }
-                Intent intent=new Intent();
-                intent.putExtra("path",data.getStringExtra("path"));
-                setResult(RESULT_OK,intent);
+            } else if (resultCode == RESULT_OK) {
+                Intent intent = new Intent();
+                intent.putExtra("duration", data.getIntExtra("duration", 0));
+                intent.putExtra("path", mOutputFile.getAbsolutePath());
+                setResult(RESULT_OK, intent);
                 finish();
             }
         }
@@ -323,9 +313,17 @@ public class RecordVideoActivity extends AppCompatActivity implements
     public boolean onTouch(View view, MotionEvent motionEvent) {
         int action = motionEvent.getAction();
         if (action == MotionEvent.ACTION_DOWN) {
-            btnRecord.setPressed(true);
-            RecordTask recordTask = new RecordTask();
-            recordTask.execute();
+            long downTime=System.currentTimeMillis();
+            if (downTime-clickTime>1000){
+                if (!isRecording){
+                    btnRecord.setPressed(true);
+                    RecordTask recordTask = new RecordTask();
+                    recordTask.execute();
+                }else if (mMediaRecorder!=null){
+                    recordComplete();
+                }
+            }
+            clickTime=downTime;
         } else if (action == MotionEvent.ACTION_UP) {
             if (isRecording && mMediaRecorder != null) {
                 recordComplete();

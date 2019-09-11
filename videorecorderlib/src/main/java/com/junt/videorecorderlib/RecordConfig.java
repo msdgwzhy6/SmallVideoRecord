@@ -99,6 +99,9 @@ public class RecordConfig {
         return this;
     }
 
+    /**
+     * 获取视频路径
+     */
     public static String obtainVideoPath(Intent data){
         if (data==null){
             throw new NullPointerException("data is NULL");
@@ -106,6 +109,9 @@ public class RecordConfig {
         return data.getStringExtra("path");
     }
 
+    /**
+     * 获取视频长度
+     */
     public static int obtainVideoDuration(Intent data){
         if (data==null){
             throw new NullPointerException("data is NULL");
@@ -113,7 +119,7 @@ public class RecordConfig {
         return data.getIntExtra("duration",0);
     }
 
-    public void obtainVideo( int requestCode) {
+    public void obtainVideo(int requestCode) {
         if (activity == null) {
             throw new NullPointerException("Please innovate method 'with()' first");
         }
